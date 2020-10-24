@@ -17,15 +17,13 @@ w.Add(3)
 Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
     fmt.Println("Promise called")
     resolve(2)
-})
-.Then(func(value interface{}) (interface{}, error) {
+}).Then(func(value interface{}) (interface{}, error) {
     fmt.Println("Then called")
     tmp, _ := value.(int)
     fmt.Println("found value", tmp)
     w.Done()
     return tmp, nil
-})
-.Then(func(value interface{}) (interface{}, error) {
+}).Then(func(value interface{}) (interface{}, error) {
     fmt.Println("Then called")
     tmp, _ := value.(int)
     fmt.Println("found value", tmp)
@@ -36,8 +34,7 @@ Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
         return nil, fmt.Errorf("it worked")
     }
     return nil, nil
-})
-.Catch(func(value interface{}) (interface{}, error) {
+}).Catch(func(value interface{}) (interface{}, error) {
     fmt.Println(value)
     w.Done()
     return nil, nil
