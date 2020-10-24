@@ -38,7 +38,7 @@ w.Wait()
 ```
 
 
-* Want bunch of Promises executed at once 👀
+* Want bunch of Promises executed at once 👀 Note: All is same as Map i.e position aware results
 ```golang
 
 var w sync.WaitGroup
@@ -125,9 +125,37 @@ Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
 })
 
 fmt.Println(data)
-
 ```
 
+
+* I want a promise right now ? 👊
+```golang
+
+var data int = 0
+Promise.Resolve(4).Finally(func(value interface{}) {
+    tmp, _ := value.(int)
+    data = tmp
+})
+
+fmt.Println(data)
+
+Promise.Reject(5).Finally(func(value interface{}) {
+    tmp, _ := value.(int)
+    data = tmp
+})
+
+fmt.Println(data)
+```
+Ya Go is async already with GoRoutines but how do I get a Synchronous wait ? 👐
+```golang
+
+dt, _ := Promise.Resolve(3).Finally(func(value interface{}) {}).(int)
+fmt.Println(dt)
+//
+// as a pattern you can orchestrate many jobs together by combining promises only to collect one final result at one single place using Finally 
+//
+
+```
 
 
 ### Test

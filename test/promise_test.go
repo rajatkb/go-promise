@@ -178,3 +178,55 @@ func TestChainAndFinally(t *testing.T) {
 		t.Errorf("expected data = %d found data = %d , Finally did not work", 4, data)
 	}
 }
+
+func TestResolveAndFinally(t *testing.T) {
+	var data int = 0
+	Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
+		resolve(2)
+	}).Then(func(value interface{}) (interface{}, error) {
+		tmp, _ := value.(int)
+		return Promise.Resolve(tmp + 1), nil
+	}).Then(func(value interface{}) (interface{}, error) {
+		tmp, _ := value.(int)
+		return Promise.Resolve(tmp + 1), nil
+	}).Finally(func(value interface{}) {
+		tmp, _ := value.(int)
+		data = tmp
+	})
+
+	if data != 4 {
+		t.Errorf("expected data = %d found data = %d , Resolve passing did not work", 4, data)
+	}
+}
+
+func TestJustFinally(t *testing.T) {
+
+	dt, _ := Promise.Resolve(3).Finally(func(value interface{}) {}).(int)
+	if dt != 3 {
+		t.Errorf("expected data = %d found data = %d , Synchronous wait on Finally failed", 3, dt)
+	}
+}
+
+func TestResolve(t *testing.T) {
+	var data int = 0
+	Promise.Resolve(4).Finally(func(value interface{}) {
+		tmp, _ := value.(int)
+		data = tmp
+	})
+
+	if data != 4 {
+		t.Errorf("expected data = %d found data = %d , Resolve passing did not work", 4, data)
+	}
+}
+
+func TestReject(t *testing.T) {
+	var data int = 0
+	Promise.Reject(4).Finally(func(value interface{}) {
+		tmp, _ := value.(int)
+		data = tmp
+	})
+
+	if data != 4 {
+		t.Errorf("expected data = %d found data = %d , Resolve passing did not work", 4, data)
+	}
+}

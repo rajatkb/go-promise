@@ -34,6 +34,29 @@ type Promise struct {
 	valueLock     sync.Mutex
 }
 
+func (obj *Promise) isFulfilled() bool {
+	obj.valueLock.Lock()
+	resolved := obj.resolved
+	failed := obj.failed
+	obj.valueLock.Unlock()
+	return resolved && !failed
+}
+
+func (obj *Promise) isRejected() bool {
+	obj.valueLock.Lock()
+	resolved := obj.resolved
+	failed := obj.failed
+	obj.valueLock.Unlock()
+	return resolved && failed
+}
+
+func (obj *Promise) isPending() bool {
+	obj.valueLock.Lock()
+	resolved := obj.resolved
+	obj.valueLock.Unlock()
+	return resolved
+}
+
 //Then ... for promise resolve
 func (obj *Promise) Then(callback Callback) *Promise {
 	return Create(func(resolve Callback, reject Callback) {
@@ -41,13 +64,33 @@ func (obj *Promise) Then(callback Callback) *Promise {
 			obj.valueWaitLock.Wait()
 			if obj.resolved && !obj.failed {
 				value, err := callback(obj.value)
+
+				/**
+				* When return value is a Promise.Resolve statement or a new *Promise
+				*
+				***/
+				vp, ok := value.(*Promise)
+				if ok {
+					vp.valueWaitLock.Wait()
+					if vp.resolved && !vp.failed {
+						resolve(vp.value)
+						return
+					}
+					if vp.resolved && vp.failed {
+						reject(vp.value)
+					}
+				}
+
 				if err == nil {
 					resolve(value)
-				} else {
-					reject(err)
+					return
 				}
+				reject(err)
+				return
+
 			} else if obj.resolved && obj.failed {
 				reject(obj.value)
+				return
 			}
 		}()
 	})
@@ -60,23 +103,68 @@ func (obj *Promise) Catch(callback Callback) *Promise {
 			obj.valueWaitLock.Wait()
 			if obj.resolved && obj.failed {
 				value, err := callback(obj.value)
+
+				/**
+				* When return value is a Promise.Resolve statement or a new *Promise
+				*
+				***/
+				vp, ok := value.(*Promise)
+				if ok {
+					vp.valueWaitLock.Wait()
+					if vp.resolved && !vp.failed {
+						resolve(vp.value)
+						return
+					}
+					if vp.resolved && vp.failed {
+						reject(vp.value)
+					}
+				}
+
 				if err == nil {
 					resolve(value)
-				} else {
-					reject(err)
+					return
 				}
+				reject(err)
+				return
 			} else if obj.resolved && !obj.failed {
 				resolve(obj.value)
+				return
 			}
 		}()
 	})
 }
 
 //Finally ... a synchronous call to finally do something at the end of Promise Chain
-func (obj *Promise) Finally(callback func(interface{})) {
+func (obj *Promise) Finally(callback func(interface{})) interface{} {
 	obj.valueWaitLock.Wait()
-	callback(obj.value)
+	if callback != nil {
+		callback(obj.value)
+	}
+	return obj.value
 }
+
+/**
+* TO-DO : Props
+* Promise.props(struct {
+*  field1 : Promise.Resolve(1)
+*  field2
+* })
+*
+**/
+
+//Map ... for the bluebird affiniadoes
+func Map(promises []*Promise) *Promise {
+	return All(promises)
+}
+
+//Reduce ... asynchronous reducer , does not waits for all promise to be resolve , it launches reduce callback as soon as first result is available
+// func Reduce(promises []*Promise, reducer func(acc interface{}, value interface{}), start interface{}) *Promise {
+
+// 	return Create(func(resolve Callback, reject Callback) {
+
+// 	})
+
+// }
 
 //All ... resolves a Promise when all promises passed are resolved,
 func All(promises []*Promise) *Promise {
@@ -113,17 +201,38 @@ func All(promises []*Promise) *Promise {
 			w.Wait()
 			if resolveStateR() {
 				resolve(data)
-			} else {
-				reject(data)
+				return
 			}
+
+			reject(data)
+			return
 		}()
 	})
 
 }
 
+//Resolve ... create a Promise with resolved value
+func Resolve(value interface{}) *Promise {
+	promise := new(Promise)
+	promise.value = value
+	promise.resolved = true
+	promise.failed = false
+	return promise
+}
+
+//Reject ... create a rejected promise
+func Reject(value interface{}) *Promise {
+	promise := new(Promise)
+	promise.value = value
+	promise.resolved = true
+	promise.failed = true
+	return promise
+}
+
 //Create ... creates a promise object
 func Create(action func(resolve Callback, reject Callback)) *Promise {
 	promise := new(Promise)
+	promise.value = nil
 	promise.resolved = false
 	promise.valueWaitLock.Add(1)
 
