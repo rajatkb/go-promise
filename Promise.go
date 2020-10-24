@@ -72,6 +72,12 @@ func (obj *Promise) Catch(callback Callback) *Promise {
 	})
 }
 
+//Finally ... a synchronous call to finally do something at the end of Promise Chain
+func (obj *Promise) Finally(callback func(interface{})) {
+	obj.valueWaitLock.Wait()
+	callback(obj.value)
+}
+
 //All ... resolves a Promise when all promises passed are resolved,
 func All(promises []*Promise) *Promise {
 

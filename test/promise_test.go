@@ -158,3 +158,23 @@ func TestChaining(t *testing.T) {
 	}
 
 }
+
+func TestChainAndFinally(t *testing.T) {
+	var data int = 0
+	Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
+		resolve(2)
+	}).Then(func(value interface{}) (interface{}, error) {
+		tmp, _ := value.(int)
+		return tmp + 1, nil
+	}).Then(func(value interface{}) (interface{}, error) {
+		tmp, _ := value.(int)
+		return tmp + 1, nil
+	}).Finally(func(value interface{}) {
+		tmp, _ := value.(int)
+		data = tmp
+	})
+
+	if data != 4 {
+		t.Errorf("expected data = %d found data = %d , Finally did not work", 4, data)
+	}
+}

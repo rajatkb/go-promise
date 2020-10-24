@@ -108,6 +108,26 @@ Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
 w.Wait()
 ```
 
+* Chain , but want to wait at the end ? 🕔️
+```golang
+var data int = 0
+Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
+    resolve(2)
+}).Then(func(value interface{}) (interface{}, error) {
+    tmp, _ := value.(int)
+    return tmp + 1, nil
+}).Then(func(value interface{}) (interface{}, error) {
+    tmp, _ := value.(int)
+    return tmp + 1, nil
+}).Finally(func(value interface{}) {
+    tmp, _ := value.(int)
+    data = tmp
+})
+
+fmt.Println(data)
+
+```
+
 
 
 ### Test
