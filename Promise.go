@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-func getSyncStateBool(initialState bool) (func() bool, func(bool)) {
+func getSyncStateBool(initialState bool) (func() bool, func(bool), func(bool) bool) {
 	var lock sync.Mutex
 	init := initialState
 	read := func() bool {
@@ -19,7 +19,15 @@ func getSyncStateBool(initialState bool) (func() bool, func(bool)) {
 		init = v
 		lock.Unlock()
 	}
-	return read, write
+
+	readWrite := func(v bool) bool {
+		lock.Lock()
+		rt := init
+		init = v
+		lock.Unlock()
+		return rt
+	}
+	return read, write, readWrite
 }
 
 //Callback ... type for callbacks
@@ -60,77 +68,77 @@ func (obj *Promise) isPending() bool {
 //Then ... for promise resolve
 func (obj *Promise) Then(callback Callback) *Promise {
 	return Create(func(resolve Callback, reject Callback) {
-		go func() {
-			obj.valueWaitLock.Wait()
-			if obj.resolved && !obj.failed {
-				value, err := callback(obj.value)
 
-				/**
-				* When return value is a Promise.Resolve statement or a new *Promise
-				*
-				***/
-				vp, ok := value.(*Promise)
-				if ok {
-					vp.valueWaitLock.Wait()
-					if vp.resolved && !vp.failed {
-						resolve(vp.value)
-						return
-					}
-					if vp.resolved && vp.failed {
-						reject(vp.value)
-					}
-				}
+		obj.valueWaitLock.Wait()
+		if obj.resolved && !obj.failed {
+			value, err := callback(obj.value)
 
-				if err == nil {
-					resolve(value)
+			/**
+			* When return value is a Promise.Resolve statement or a new *Promise
+			*
+			***/
+			vp, ok := value.(*Promise)
+			if ok {
+				vp.valueWaitLock.Wait()
+				if vp.resolved && !vp.failed {
+					resolve(vp.value)
 					return
 				}
-				reject(err)
-				return
+				if vp.resolved && vp.failed {
+					reject(vp.value)
+				}
+			}
 
-			} else if obj.resolved && obj.failed {
-				reject(obj.value)
+			if err == nil {
+				resolve(value)
 				return
 			}
-		}()
+			reject(err)
+			return
+
+		} else if obj.resolved && obj.failed {
+			reject(obj.value)
+			return
+		}
+
 	})
 }
 
 //Catch ... for promise fail
 func (obj *Promise) Catch(callback Callback) *Promise {
 	return Create(func(resolve Callback, reject Callback) {
-		go func() {
-			obj.valueWaitLock.Wait()
-			if obj.resolved && obj.failed {
-				value, err := callback(obj.value)
 
-				/**
-				* When return value is a Promise.Resolve statement or a new *Promise
-				*
-				***/
-				vp, ok := value.(*Promise)
-				if ok {
-					vp.valueWaitLock.Wait()
-					if vp.resolved && !vp.failed {
-						resolve(vp.value)
-						return
-					}
-					if vp.resolved && vp.failed {
-						reject(vp.value)
-					}
-				}
+		obj.valueWaitLock.Wait()
+		if obj.resolved && obj.failed {
+			value, err := callback(obj.value)
 
-				if err == nil {
-					resolve(value)
+			/**
+			* When return value is a Promise.Resolve statement or a new *Promise
+			*
+			***/
+			vp, ok := value.(*Promise)
+			if ok {
+				vp.valueWaitLock.Wait()
+				if vp.resolved && !vp.failed {
+					resolve(vp.value)
 					return
 				}
-				reject(err)
-				return
-			} else if obj.resolved && !obj.failed {
-				resolve(obj.value)
+				if vp.resolved && vp.failed {
+					reject(vp.value)
+				}
+			}
+
+			if err == nil {
+				resolve(value)
 				return
 			}
-		}()
+			reject(err)
+			return
+		} else if obj.resolved && !obj.failed {
+			resolve(obj.value)
+			return
+		}
+
 	})
 }
 
@@ -166,47 +174,94 @@ func Map(promises []*Promise) *Promise {
 
 // }
 
+//Race ... resolves to the very first promise, rejects if none of the promises resolves
+func Race(promises []*Promise) *Promise {
+
+	return Create(func(resolve Callback, reject Callback) {
+
+		errList := make([]interface{}, len(promises))
+
+		resolvedStateR, resolvedStateW, _ := getSyncStateBool(false)
+
+		var wait sync.WaitGroup
+		wait.Add(len(promises))
+		for i, promise := range promises {
+			index := i
+			if promise == nil {
+				continue
+			}
+			promise.Then(func(value interface{}) (interface{}, error) {
+
+				resolve(value)
+				// if !resolvedRW(true) {
+				// 	message <- value
+				// }
+				wait.Done()
+				resolvedStateW(true)
+				return nil, nil
+			}).Catch(func(value interface{}) (interface{}, error) {
+				// if !resolvedR() {
+				// 	errs <- value
+				wait.Done()
+				errList[index] = value
+				// }
+				return nil, nil
+			})
+
+			// this avoids launching extra go routings using then and catch
+			if resolvedStateR() {
+				return
+			}
+		}
+
+		wait.Wait()
+		if resolvedStateR() {
+			return
+		}
+		reject(errList)
+
+	})
+}
+
 //All ... resolves a Promise when all promises passed are resolved,
 func All(promises []*Promise) *Promise {
 
 	return Create(func(resolve Callback, reject Callback) {
-		go func() {
-			var w sync.WaitGroup
 
-			resolveStateR, resolveStateW := getSyncStateBool(true)
+		var w sync.WaitGroup
 
-			data := make([]interface{}, len(promises))
-			w.Add(len(promises))
-			for i, promise := range promises {
-				index := i // because go catches current i value not the ones that was encountered when loop was at this loop state
-				if promise == nil {
-					data[index] = nil
-					w.Done()
-					continue
-				}
-				promise.Then(func(value interface{}) (interface{}, error) {
-					data[index] = value
-					w.Done()
-					resolveStateW(true && resolveStateR())
-					return nil, nil
-				})
-				promise.Catch(func(value interface{}) (interface{}, error) {
+		successStateR, successStateW, _ := getSyncStateBool(true)
 
-					data[index] = value
-					resolveStateW(false && resolveStateR())
-					w.Done()
-					return nil, nil
-				})
+		data := make([]interface{}, len(promises))
+		w.Add(len(promises))
+		for i, promise := range promises {
+			index := i // because go catches current i value not the ones that was encountered when loop was at this loop state
+			if promise == nil {
+				data[index] = nil
+				w.Done()
+				continue
 			}
-			w.Wait()
-			if resolveStateR() {
-				resolve(data)
-				return
-			}
+			promise.Then(func(value interface{}) (interface{}, error) {
+				data[index] = value
+				w.Done()
+				return nil, nil
+			})
+			promise.Catch(func(value interface{}) (interface{}, error) {
+				data[index] = value
 
-			reject(data)
+				successStateW(false)
+				w.Done()
+				return nil, nil
+			})
+		}
+		w.Wait()
+		if successStateR() {
+			resolve(data)
 			return
-		}()
+		}
+
+		reject(data)
+		return
 	})
 
 }
@@ -237,25 +292,27 @@ func Create(action func(resolve Callback, reject Callback)) *Promise {
 	promise.valueWaitLock.Add(1)
 
 	go action(func(data interface{}) (interface{}, error) {
+		promise.valueLock.Lock()
 		if promise.resolved == false {
-			promise.valueLock.Lock()
+
 			promise.value = data
 			promise.resolved = true
 			promise.failed = false
-			promise.valueLock.Unlock()
 			promise.valueWaitLock.Done()
 		}
+		promise.valueLock.Unlock()
+
 		return promise.value, nil
 
 	}, func(err interface{}) (interface{}, error) {
+		promise.valueLock.Lock()
 		if promise.resolved == false {
-			promise.valueLock.Lock()
 			promise.value = err
 			promise.resolved = true
 			promise.failed = true
-			promise.valueLock.Unlock()
 			promise.valueWaitLock.Done()
 		}
+		promise.valueLock.Unlock()
 		v, _ := promise.value.(string)
 		return promise.value, fmt.Errorf(v)
 	})

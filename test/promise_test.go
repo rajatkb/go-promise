@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	Promise "github.com/rajatkb/go-promise"
 )
@@ -79,6 +80,49 @@ func TestThenAndCatchTogether(t *testing.T) {
 	}
 }
 
+func TestPromiseAllResolve(t *testing.T) {
+
+	var d bool = true
+	var w sync.WaitGroup
+	w.Add(1)
+
+	promises := make([]*Promise.Promise, 10)
+	for i := 0; i < 10; i++ {
+		promises[i] = Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
+			time.Sleep(time.Duration(i*100) * time.Millisecond)
+			resolve(2)
+		})
+	}
+
+	Promise.All(promises).Then(func(value interface{}) (interface{}, error) {
+		v, _ := value.([]interface{})
+		array := make([]int, 10)
+		for i, _v := range v {
+			array[i] = _v.(int)
+		}
+
+		if len(array) != 10 {
+			d = false
+			w.Done()
+			return nil, nil
+		}
+		for _, r := range array {
+			if r != 2 {
+				d = false
+			}
+
+		}
+		w.Done()
+		return nil, nil
+	})
+
+	w.Wait()
+
+	if !d {
+		t.Errorf("Promise.All failed")
+	}
+}
+
 func TestPromiseAll(t *testing.T) {
 	var d bool = true
 	var w sync.WaitGroup
@@ -87,12 +131,14 @@ func TestPromiseAll(t *testing.T) {
 	promises := make([]*Promise.Promise, 20)
 	for i := 0; i < 10; i++ {
 		promises[i] = Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
+			time.Sleep(time.Duration(i*100) * time.Millisecond)
 			resolve(2)
 		})
 	}
 
 	for i := 10; i < 20; i++ {
 		promises[i] = Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
+			time.Sleep(time.Duration(i*100) * time.Millisecond)
 			reject(3)
 		})
 	}
@@ -101,8 +147,19 @@ func TestPromiseAll(t *testing.T) {
 		w.Done()
 		return nil, nil
 	}).Catch(func(value interface{}) (interface{}, error) {
-		v, _ := value.([]int)
-		for i, r := range v {
+
+		v, _ := value.([]interface{})
+		array := make([]int, 20)
+		for i, _v := range v {
+			array[i] = _v.(int)
+		}
+
+		if len(array) != 20 {
+			d = false
+			w.Done()
+			return nil, nil
+		}
+		for i, r := range array {
 			if i < 10 {
 				if r != 2 {
 					d = false
@@ -229,4 +286,120 @@ func TestReject(t *testing.T) {
 	if data != 4 {
 		t.Errorf("expected data = %d found data = %d , Resolve passing did not work", 4, data)
 	}
+}
+
+func TestRaceSomePass(t *testing.T) {
+	var d bool = false
+	var w sync.WaitGroup
+	w.Add(1)
+
+	promises := make([]*Promise.Promise, 3)
+	for i := 0; i < len(promises); i++ {
+		index := i
+		promises[i] = Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
+			time.Sleep(time.Duration(index)*time.Second + time.Duration(10))
+			resolve(index + 1)
+		})
+	}
+
+	Promise.Race(promises).Then(func(value interface{}) (interface{}, error) {
+		v, _ := value.(int)
+		if v == 1 {
+			d = true
+		}
+		w.Done()
+		return nil, nil
+	})
+
+	w.Wait()
+	if !d {
+		t.Errorf("Promise.Race failed ")
+	}
+}
+
+func TestRaceSomePassWithReject(t *testing.T) {
+	var d bool = false
+	var w sync.WaitGroup
+	w.Add(1)
+
+	promises := make([]*Promise.Promise, 20)
+	for i := 0; i < 10; i++ {
+		index := i
+		promises[i] = Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
+			time.Sleep(time.Duration(index)*time.Second + time.Duration(10))
+			resolve(index + 1)
+		})
+	}
+
+	for i := 10; i < 20; i++ {
+		index := i
+		promises[i] = Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
+			time.Sleep(time.Duration(index)*time.Second + time.Duration(10))
+			reject(index + 1)
+		})
+	}
+
+	Promise.Race(promises).Then(func(value interface{}) (interface{}, error) {
+		v, _ := value.(int)
+		if v == 1 {
+			d = true
+		}
+		w.Done()
+		return nil, nil
+	})
+
+	w.Wait()
+	if !d {
+		t.Errorf("Promise.Race failed ")
+	}
+}
+
+func TestRaceWithReject(t *testing.T) {
+	var d bool = false
+	var w sync.WaitGroup
+	w.Add(1)
+
+	promises := make([]*Promise.Promise, 10)
+
+	for i := 0; i < 10; i++ {
+		index := i
+		promises[i] = Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
+			time.Sleep(time.Duration(index)*time.Second + time.Duration(10))
+			reject(index + 1)
+		})
+	}
+
+	Promise.Race(promises).Catch(func(value interface{}) (interface{}, error) {
+		array, _ := value.([]interface{})
+		first := array[0].(int)
+
+		if len(array) == 10 && first == 1 {
+			d = true
+		}
+		w.Done()
+		return nil, nil
+	})
+
+	w.Wait()
+	if !d {
+		t.Errorf("Promise.Race failed ")
+	}
+}
+
+func TestRaceWithFinally(t *testing.T) {
+	promises := make([]*Promise.Promise, 3)
+	for i := 0; i < len(promises); i++ {
+		index := i
+		promises[i] = Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
+			time.Sleep(time.Duration(index)*time.Second + time.Duration(10))
+			resolve(index + 1)
+		})
+	}
+
+	val, _ := Promise.Race(promises).Finally(func(value interface{}) {}).(int)
+
+	if val != 1 {
+		t.Errorf("Race with finally failed")
+	}
+
 }

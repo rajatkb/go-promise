@@ -12,6 +12,9 @@ $ go get github.com/rajatkb/go-promise
 * Create a single promise
 ```golang
 
+import "github.com/rajatkb/go-promise"
+
+
 // Create a single 
 promise := Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
 		resolve(2)
@@ -38,38 +41,6 @@ w.Wait()
 ```
 
 
-* Want bunch of Promises executed at once 👀 Note: All is same as Map i.e position aware results
-```golang
-
-var w sync.WaitGroup
-	w.Add(1)
-
-	promises := make([]*Promise.Promise, 20)
-	for i := 0; i < 10; i++ {
-		promises[i] = Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
-			resolve(2)
-		})
-	}
-
-	for i := 10; i < 20; i++ {
-		promises[i] = Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
-			reject(3)
-		})
-	}
-
-	Promise.All(promises).Then(func(value interface{}) (interface{}, error) {
-		w.Done()
-		return nil, nil
-	}).Catch(func(value interface{}) (interface{}, error) {
-		v, _ := value.([]int)
-        fmt.Println(v)
-		w.Done()
-		return nil, nil
-	})
-
-	w.Wait()
-
-```
 
 
 * Chaing your Then and Catch
@@ -146,6 +117,9 @@ Promise.Reject(5).Finally(func(value interface{}) {
 
 fmt.Println(data)
 ```
+
+
+
 Ya Go is async already with GoRoutines but how do I get a Synchronous wait ? 👐
 ```golang
 
@@ -158,7 +132,66 @@ fmt.Println(dt)
 ```
 
 
-### Test
+
+
+* Want bunch of Promises executed at once 👀 Note: All is same as Map i.e position aware results
+```golang
+
+var w sync.WaitGroup
+	w.Add(1)
+
+	promises := make([]*Promise.Promise, 20)
+	for i := 0; i < 10; i++ {
+		promises[i] = Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
+			resolve(2)
+		})
+	}
+
+	for i := 10; i < 20; i++ {
+		promises[i] = Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
+			reject(3)
+		})
+	}
+
+	Promise.All(promises).Then(func(value interface{}) (interface{}, error) {
+		w.Done()
+		return nil, nil
+	}).Catch(func(value interface{}) (interface{}, error) {
+        fmt.Println(value)
+		w.Done()
+		return nil, nil
+	})
+
+	w.Wait()
+
+```
+
+* What about Go Routines that race to finish and you just want the winner ? 😎
+```golang
+
+
+promises := make([]*Promise.Promise, 3)
+	for i := 0; i < len(promises); i++ {
+		index := i
+		promises[i] = Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
+			time.Sleep(time.Duration(index)*time.Second + time.Duration(10))
+			resolve(index + 1)
+		})
+	}
+
+val, _ := Promise.Race(promises).Finally(func(value interface{}) {}).(int)
+
+// Cactch statements in case of collection operation returns a list of error for all promises that provided error
+
+fmt.Println("Winner is :",val)
+
+```
+
+
+
+### Development
+
+#### Test
 ```
 $ go test -v ./test
 ```
