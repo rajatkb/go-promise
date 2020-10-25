@@ -12,7 +12,7 @@ $ go get github.com/rajatkb/go-promise
 * Create a single promise
 ```golang
 
-import "github.com/rajatkb/go-promise"
+import Promise "github.com/rajatkb/go-promise"
 
 
 // Create a single 
