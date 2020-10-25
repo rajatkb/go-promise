@@ -189,7 +189,8 @@ promises := make([]*Promise.Promise, 3)
 
 val, _ := Promise.Race(promises).Finally(nil).(int)
 
-// Cactch statements in case of collection operation returns a list of error for all promises that provided error
+// Catch statements in case of collection operation 
+// returns a list of error for all promises that provided error
 
 fmt.Println("Winner is :",val)
 
