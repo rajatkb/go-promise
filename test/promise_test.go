@@ -396,7 +396,7 @@ func TestRaceWithFinally(t *testing.T) {
 		})
 	}
 
-	val, _ := Promise.Race(promises).Finally(func(value interface{}) {}).(int)
+	val, _ := Promise.Race(promises).Finally(nil).(int)
 
 	if val != 1 {
 		t.Errorf("Race with finally failed")

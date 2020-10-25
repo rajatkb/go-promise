@@ -126,15 +126,19 @@ Ya Go is async already with GoRoutines but how do I get a Synchronous wait ? �
 dt, _ := Promise.Resolve(3).Finally(func(value interface{}) {}).(int)
 fmt.Println(dt)
 //
-// as a pattern you can orchestrate many jobs together by combining promises only to collect one final result at one single place using Finally 
+// as a pattern you can orchestrate many jobs together by 
+// combining promises only to collect one final result at one s
+// ingle place using Finally 
 //
+// You can pass nil to Finally also , instead of a function
 
 ```
 
 
 
 
-* Want bunch of Promises executed at once 👀 Note: All is same as Map i.e position aware results
+* Want bunch of Promises executed at once 👀 Note: 
+  All is same as Map i.e position aware results
 ```golang
 
 var w sync.WaitGroup
@@ -142,20 +146,23 @@ var w sync.WaitGroup
 
 	promises := make([]*Promise.Promise, 20)
 	for i := 0; i < 10; i++ {
-		promises[i] = Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
-			resolve(2)
+		promises[i] = Promise.Create(
+            func(resolve Promise.Callback, reject Promise.Callback) {
+		    	resolve(2)
 		})
 	}
 
 	for i := 10; i < 20; i++ {
-		promises[i] = Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
-			reject(3)
+		promises[i] = Promise.Create(
+            func(resolve Promise.Callback, reject Promise.Callback) {
+			    reject(3)
 		})
 	}
 
-	Promise.All(promises).Then(func(value interface{}) (interface{}, error) {
-		w.Done()
-		return nil, nil
+	Promise.All(promises).Then(
+        func(value interface{}) (interface{}, error) {
+		    w.Done()
+		    return nil, nil
 	}).Catch(func(value interface{}) (interface{}, error) {
         fmt.Println(value)
 		w.Done()
@@ -173,13 +180,14 @@ var w sync.WaitGroup
 promises := make([]*Promise.Promise, 3)
 	for i := 0; i < len(promises); i++ {
 		index := i
-		promises[i] = Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
-			time.Sleep(time.Duration(index)*time.Second + time.Duration(10))
-			resolve(index + 1)
+		promises[i] = Promise.Create(
+            func(resolve Promise.Callback, reject Promise.Callback) {
+			    time.Sleep(time.Duration(index)*time.Second + time.Duration(10))
+			    resolve(index + 1)
 		})
 	}
 
-val, _ := Promise.Race(promises).Finally(func(value interface{}) {}).(int)
+val, _ := Promise.Race(promises).Finally(nil).(int)
 
 // Cactch statements in case of collection operation returns a list of error for all promises that provided error
 
