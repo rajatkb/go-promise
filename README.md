@@ -261,6 +261,9 @@ for value := range Promise.AsyncGenerator(promises) {
  Yes the Reduce provided here internally uses AsyncGenerator to grab data and quicly
  launch promise task to to luanch reducer for each data. Effectively pipelining with
  the promises passsed to it. 
+ 
+ Note: It uses AsyncGenerator internally hence reduce will 
+ also get errors for processing , can be avoided by error handled promises
 ```golang
 
 promises := make([]*Promise.Promise, 3)
