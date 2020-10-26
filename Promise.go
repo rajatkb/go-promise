@@ -173,10 +173,17 @@ func (obj *Promise) Catch(callback Callback) *Promise {
 //Finally ... a synchronous call to finally do something at the end of Promise Chain
 func (obj *Promise) Finally(callback func(interface{})) interface{} {
 	obj.valueWaitLock.Wait()
-	if callback != nil {
-		callback(obj.value)
+	value := obj.value
+	vp, ok := value.(*Promise)
+	if ok {
+		vp.valueWaitLock.Wait()
+		value = vp.value
 	}
-	return obj.value
+	if callback != nil {
+		callback(value)
+	}
+
+	return value
 }
 
 /**
@@ -200,12 +207,21 @@ func Map(promises []*Promise, cb Callback) []*Promise {
 }
 
 //Reduce ... asynchronous reducer , does not waits for all promise to be resolve , it launches reduce callback as soon as first result is available
-// func Reduce(promises []*Promise, reducer func(acc interface{}, value interface{}), start interface{}) *Promise {
-
-// 	return Create(func(resolve Callback, reject Callback) {
-
-// 	})
-// }
+// It will be used to process both errors and values. So reduces should account for that.
+func Reduce(promises []*Promise, reducer func(index int, acc interface{}, value interface{}) interface{}, acc interface{}) *Promise {
+	return Create(func(resolve Callback, reject Callback) {
+		promise := Resolve(acc)
+		count := 0
+		for asyncValue := range AsyncGenerator(promises) {
+			index := count
+			promise = promise.Then(func(acc interface{}) (interface{}, error) {
+				return reducer(index, acc, asyncValue), nil
+			})
+			count++
+		}
+		resolve(promise)
+	})
+}
 
 //// FUNCTIONAL DONE /////////////////////
 

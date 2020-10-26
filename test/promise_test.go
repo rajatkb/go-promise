@@ -461,3 +461,24 @@ func TestAsyncGenerator(t *testing.T) {
 		t.Errorf("Failed async generator")
 	}
 }
+
+func TestReducer(t *testing.T) {
+	promises := make([]*Promise.Promise, 3)
+	for i := 0; i < len(promises); i++ {
+		index := i
+		promises[i] = Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
+			time.Sleep(time.Duration(index)*time.Second + time.Duration(10))
+			resolve(index + 1)
+		})
+	}
+
+	value := Promise.Reduce(promises, func(index int, acci interface{}, valuei interface{}) interface{} {
+		acc, _ := acci.(int)
+		value, _ := valuei.(int)
+		acc = value + acc
+		return acc
+	}, 0).Finally(nil)
+	if value != 6 {
+		t.Errorf("Reduce did not work")
+	}
+}
