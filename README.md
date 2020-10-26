@@ -79,6 +79,7 @@ Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
 w.Wait()
 ```
 
+
 * Chain , but want to wait at the end ? 🕔️
 ```golang
 var data int = 0
@@ -94,6 +95,18 @@ Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
     tmp, _ := value.(int)
     data = tmp
 })
+
+//// or u can simply return the value
+
+value := Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
+    resolve(2)
+}).Then(func(value interface{}) (interface{}, error) {
+    tmp, _ := value.(int)
+    return tmp + 1, nil
+}).Then(func(value interface{}) (interface{}, error) {
+    tmp, _ := value.(int)
+    return tmp + 1, nil
+}).Finally(nil)
 
 fmt.Println(data)
 ```
@@ -120,7 +133,7 @@ fmt.Println(data)
 
 
 
-Ya Go is async already with GoRoutines but how do I get a Synchronous wait ? 👐
+* Ya Go is async already with GoRoutines but how do I get a Synchronous wait ? 👐
 ```golang
 
 dt, _ := Promise.Resolve(3).Finally(func(value interface{}) {}).(int)
@@ -134,11 +147,40 @@ fmt.Println(dt)
 
 ```
 
+* I want to manage my Promise , Cancel it , Inspect it ? Yes you can 😏
+```golang
+
+// IsPending
+p := Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
+		time.Sleep(time.Duration(3) * time.Second)
+		resolve(3)
+    }).IsPending()
+
+fmt.Println(p)
+
+//isFulFilled
+f := Promise.Resolve(3).isFulfilled()
+
+fmt.Println(f)
+
+//Timeout
+p := Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
+		time.Sleep(time.Duration(1) * time.Second) // wait for a second
+        resolve(false)
+        
+        // but timeout in half a second
+	}).Timeout(500).Catch(func(value interface{}) (interface{}, error) {
+		return true, nil
+    }).Finally(nil)
+
+
+    
+```
 
 
 
 * Want bunch of Promises executed at once 👀 Note: 
-  All is same as Map i.e position aware results
+  These are position aware nothing is jumbled
 ```golang
 
 var w sync.WaitGroup
@@ -196,6 +238,25 @@ fmt.Println("Winner is :",val)
 
 ```
 
+* But I want bunch of Promises returning me the fastest they can ? 😥
+  Worry not you have async generators
+```golang
+
+promises := make([]*Promise.Promise, 3)
+for i := 0; i < len(promises); i++ {
+    index := i
+    promises[i] = Promise.Create(
+        func(resolve Promise.Callback, reject Promise.Callback) {
+            time.Sleep(time.Duration(index)*time.Second + time.Duration(10))
+            resolve(index + 1)
+    })
+}
+
+for value := range Promise.AsyncGenerator(promises) {
+    fmt.Println(value)
+}
+
+```
 
 
 ### Development

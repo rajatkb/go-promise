@@ -3,6 +3,7 @@ package promise
 import (
 	"fmt"
 	"sync"
+	"time"
 )
 
 func getSyncStateBool(initialState bool) (func() bool, func(bool), func(bool) bool) {
@@ -42,7 +43,8 @@ type Promise struct {
 	valueLock     sync.Mutex
 }
 
-func (obj *Promise) isFulfilled() bool {
+//IsFulfilled ... checks whether promiseis fullfilled or not
+func (obj *Promise) IsFulfilled() bool {
 	obj.valueLock.Lock()
 	resolved := obj.resolved
 	failed := obj.failed
@@ -50,7 +52,8 @@ func (obj *Promise) isFulfilled() bool {
 	return resolved && !failed
 }
 
-func (obj *Promise) isRejected() bool {
+//IsRejected ... checks whether promise is rejected or not
+func (obj *Promise) IsRejected() bool {
 	obj.valueLock.Lock()
 	resolved := obj.resolved
 	failed := obj.failed
@@ -58,11 +61,36 @@ func (obj *Promise) isRejected() bool {
 	return resolved && failed
 }
 
-func (obj *Promise) isPending() bool {
+//IsPending ... checks whether promise is pending or not
+func (obj *Promise) IsPending() bool {
 	obj.valueLock.Lock()
 	resolved := obj.resolved
 	obj.valueLock.Unlock()
-	return resolved
+	return !resolved
+}
+
+//Cancel ... cancels a promise
+func (obj *Promise) Cancel() bool {
+	wasCancelled := false
+	obj.valueLock.Lock()
+	if !obj.resolved {
+		obj.resolved = true
+		obj.failed = true
+		obj.value = fmt.Errorf("Error: Promise Canecelled")
+		obj.valueWaitLock.Done()
+		wasCancelled = true
+	}
+	obj.valueLock.Unlock()
+	return wasCancelled
+}
+
+//Timeout ... cancels a promise
+func (obj *Promise) Timeout(ms int) *Promise {
+	go func() {
+		time.Sleep(time.Duration(ms) * time.Millisecond)
+		obj.Cancel()
+	}()
+	return obj
 }
 
 //Then ... for promise resolve
@@ -160,9 +188,15 @@ func (obj *Promise) Finally(callback func(interface{})) interface{} {
 *
 **/
 
-//Map ... for the bluebird affiniadoes
-func Map(promises []*Promise) *Promise {
-	return All(promises)
+//// WE GO FUNCTIONALL BRRRRRRRRRRRRRR................. ///////////////
+
+//Map ... for the bluebird affiniadoes , maps your array of promise with a new common then
+func Map(promises []*Promise, cb func(value interface{}) (interface{}, error)) []*Promise {
+	promisesT := make([]*Promise, len(promises))
+	for i, promise := range promises {
+		promisesT[i] = promise.Then(cb)
+	}
+	return promisesT
 }
 
 //Reduce ... asynchronous reducer , does not waits for all promise to be resolve , it launches reduce callback as soon as first result is available
@@ -171,8 +205,35 @@ func Map(promises []*Promise) *Promise {
 // 	return Create(func(resolve Callback, reject Callback) {
 
 // 	})
-
 // }
+
+//// FUNCTIONAL DONE /////////////////////
+
+//AsyncGenerator ... returns the results & errors of promises , without any ordering to the caller
+func AsyncGenerator(promises []*Promise) <-chan interface{} {
+	messages := make(chan interface{}, len(promises))
+	var w sync.WaitGroup
+	w.Add(len(promises))
+	go func() {
+		for _, promise := range promises {
+			promise.Then(func(value interface{}) (interface{}, error) {
+				messages <- value
+				w.Done()
+				return nil, nil
+			}).Catch(func(err interface{}) (interface{}, error) {
+				messages <- err
+				w.Done()
+				return nil, nil
+			})
+		}
+	}()
+
+	go func() {
+		w.Wait()
+		close(messages)
+	}()
+	return messages
+}
 
 //Race ... resolves to the very first promise, rejects if none of the promises resolves
 func Race(promises []*Promise) *Promise {

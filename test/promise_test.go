@@ -403,3 +403,61 @@ func TestRaceWithFinally(t *testing.T) {
 	}
 
 }
+
+func TestIsPending(t *testing.T) {
+	p := Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
+		time.Sleep(time.Duration(3) * time.Second)
+		resolve(3)
+	})
+
+	p2 := Promise.Resolve(3)
+
+	if !p.IsPending() || p2.IsPending() {
+		t.Errorf("IsPending not working")
+	}
+}
+
+func TestIsFullFilled(t *testing.T) {
+	p := Promise.Resolve(3)
+	if !p.IsFulfilled() {
+		t.Errorf("IsFullFilled not working")
+	}
+}
+
+func TestTimeout(t *testing.T) {
+	s := false
+	p := Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
+		time.Sleep(time.Duration(1) * time.Second)
+		resolve(false)
+	}).Timeout(500).Catch(func(value interface{}) (interface{}, error) {
+		return true, nil
+	}).Finally(nil)
+	s = p.(bool)
+	if !s {
+		t.Errorf("Failed to TimeOUt promise")
+	}
+
+}
+
+func TestAsyncGenerator(t *testing.T) {
+	promises := make([]*Promise.Promise, 3)
+	for i := 0; i < len(promises); i++ {
+		index := i
+		promises[i] = Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
+			time.Sleep(time.Duration(index)*time.Second + time.Duration(10))
+			resolve(index + 1)
+		})
+	}
+	count := 0
+	i := 1
+	for value := range Promise.AsyncGenerator(promises) {
+		v, _ := value.(int)
+		if i == v {
+			count++
+			i++
+		}
+	}
+	if count != 3 {
+		t.Errorf("Failed async generator")
+	}
+}
