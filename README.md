@@ -181,8 +181,8 @@ p := Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
 
 
 
-* Want bunch of Promises executed at once 👀 Note: 
-  These are position aware nothing is jumbled
+* Want bunch of Promises executed at once 👀   
+  Note: These are position aware nothing is jumbled
 ```golang
 
 
@@ -255,9 +255,14 @@ for value := range Promise.AsyncGenerator(promises) {
     fmt.Println(value)
 }
 
-```
+```  
 
-*My Map is all parallel , can I have a reduce, that pipelines with request delays ? 👩‍⚖️
+
+
+
+
+
+* My Map is all parallel , can I have a reduce, that pipelines with request delays ? 👩‍⚖️  
  Yes the Reduce provided here internally uses AsyncGenerator to grab data and quicly
  launch promise task to to luanch reducer for each data. Effectively pipelining with
  the promises passsed to it. 
@@ -269,17 +274,19 @@ for value := range Promise.AsyncGenerator(promises) {
 promises := make([]*Promise.Promise, 3)
 for i := 0; i < len(promises); i++ {
     index := i
-    promises[i] = Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
-        time.Sleep(time.Duration(index)*time.Second + time.Duration(10))
-        resolve(index + 1)
+    promises[i] = Promise.Create(
+        func(resolve Promise.Callback, reject Promise.Callback) {
+            time.Sleep(time.Duration(index)*time.Second + time.Duration(10))
+            resolve(index + 1)
     })
 }
 
-value := Promise.Reduce(promises, func(index int, acci interface{}, valuei interface{}) interface{} {
-    acc, _ := acci.(int)
-    value, _ := valuei.(int)
-    acc = value + acc
-    return acc
+value := Promise.Reduce(promises, 
+        func(index int, acci interface{}, valuei interface{}) interface{} {
+                acc, _ := acci.(int)
+                value, _ := valuei.(int)
+                acc = value + acc
+                return acc
 }, 0).Finally(nil)
 
 ```
