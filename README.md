@@ -185,35 +185,32 @@ p := Promise.Create(func(resolve Promise.Callback, reject Promise.Callback) {
   These are position aware nothing is jumbled
 ```golang
 
-var w sync.WaitGroup
-	w.Add(1)
 
-	promises := make([]*Promise.Promise, 20)
-	for i := 0; i < 10; i++ {
-		promises[i] = Promise.Create(
-            func(resolve Promise.Callback, reject Promise.Callback) {
-		    	resolve(2)
-		})
-	}
 
-	for i := 10; i < 20; i++ {
-		promises[i] = Promise.Create(
-            func(resolve Promise.Callback, reject Promise.Callback) {
-			    reject(3)
-		})
-	}
+promises := make([]*Promise.Promise, 20)
+for i := 0; i < 10; i++ {
+    promises[i] = Promise.Create(
+        func(resolve Promise.Callback, reject Promise.Callback) {
+            resolve(2)
+    })
+}
 
-	Promise.All(promises).Then(
-        func(value interface{}) (interface{}, error) {
-		    w.Done()
-		    return nil, nil
-	}).Catch(func(value interface{}) (interface{}, error) {
-        fmt.Println(value)
-		w.Done()
-		return nil, nil
-	})
+for i := 10; i < 20; i++ {
+    promises[i] = Promise.Create(
+        func(resolve Promise.Callback, reject Promise.Callback) {
+            reject(3)
+    })
+}
 
-	w.Wait()
+Promise.All(promises).Then(
+    func(value interface{}) (interface{}, error) {
+        w.Done()
+        return nil, nil
+}).Catch(func(value interface{}) (interface{}, error) {
+    fmt.Println(value)
+    w.Done()
+    return nil, nil
+}).Finally(nil)
 
 ```
 
