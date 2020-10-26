@@ -191,7 +191,7 @@ func (obj *Promise) Finally(callback func(interface{})) interface{} {
 //// WE GO FUNCTIONALL BRRRRRRRRRRRRRR................. ///////////////
 
 //Map ... for the bluebird affiniadoes , maps your array of promise with a new common then
-func Map(promises []*Promise, cb func(value interface{}) (interface{}, error)) []*Promise {
+func Map(promises []*Promise, cb Callback) []*Promise {
 	promisesT := make([]*Promise, len(promises))
 	for i, promise := range promises {
 		promisesT[i] = promise.Then(cb)
