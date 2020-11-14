@@ -1,4 +1,4 @@
-# go-promise 
+# [Go-Promise] Library
 Go Promise aims to be a Promise/Future alternative of bluebird in golang. It will give all the various functionalities provided by any standard promise library along with something more.
 Now you may ask why should I use Promise/Futures in go-lang. The language never intended for it So why should I. The answer is to orchestrate your go routines. The go-promise here provided
 launches goroutines for all callbacks making it suitable for golang , but always uses mutexes and semaphores internally to synchronise between themselved. It gives you common synchronization patterns to work with. Currently the API supports much of the common use cases. More will be coming , as I find much usefull patterns in go which can be incorporated inside a promise library.
